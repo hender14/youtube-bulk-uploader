@@ -74,3 +74,22 @@ The local source video is never deleted. Cloud temporary-object deletion,
 remote state retention, direct browser-to-Storage uploads, Web OAuth, and
 Cloud Run Jobs are still to be implemented. No cloud deployment is performed
 by this CLI.
+
+## Tagged releases
+
+After merging reviewed changes into `main`, create a `vX.Y.Z` tag whose version
+matches this crate. GitHub Actions runs Rust CI and verifies that the tagged
+commit is reachable from `main`, then builds a Linux x86_64 executable and
+creates a draft GitHub Release with automatically generated notes, ELF, and
+`SHA256SUMS`. Ordinary pushes and PR merges do not create releases.
+
+Protect version tags with repository rulesets, and configure required reviewers
+and tag restrictions for the `release` Environment. Naming the Environment in
+YAML alone does not enable approval. Review the notes and artifacts before
+publishing; GitHub generates the headings and change list, not a translation.
+No OAuth credentials are provided to the release build. Do not embed secrets
+in source or build arguments: ELF and release notes become public on publication.
+
+The release workflow does not deploy to GCP. The later deployment stage must
+build from trusted, reviewed source rather than execute an externally supplied
+ELF, and require separate production approval and narrowly scoped OIDC access.
