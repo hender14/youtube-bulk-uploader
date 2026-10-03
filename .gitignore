@@ -10,10 +10,20 @@ wheels/
 .venv
 
 .env
+.secrets/
+*.token.json
+*.sqlite3
+*.db
 temp_uploads/
+tmp/
+.chrome_profile/
+.streamlit/secrets.toml
 *.mp4
 *.mov
 *.mkv
 .venv/
 __pycache__/
 .uv/
+/rust/target/
+/token.json
+gha-creds-*.json
