@@ -1,0 +1,57 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["cargo", "rust-toolchain", "github-actions", "terraform", "dockerfile", "custom.regex"],
+  "minimumReleaseAge": "7 days",
+  "minimumReleaseAgeBehaviour": "timestamp-required",
+  "internalChecksFilter": "strict",
+  "prCreation": "immediate",
+  "automerge": false,
+  "dependencyDashboard": true,
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
+  "ignoreUnstable": true,
+  "lockFileMaintenance": { "enabled": false },
+  "commitMessageAction": "更新",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "{{newVersion}} へ",
+  "commitMessageLowerCase": "never",
+  "prHeader": "依存関係・ツールの更新候補です。CIと変更内容を確認し、管理者がマージしてください。通常の更新は公開から7日以上待機します。",
+  "prBodyHeadingDefinitions": {
+    "Package": "対象",
+    "Type": "種別",
+    "Update": "更新",
+    "Change": "変更",
+    "Pending": "待機"
+  },
+  "vulnerabilityAlerts": {
+    "minimumReleaseAge": "7 days",
+    "automerge": false
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "matchManagers": ["cargo", "terraform"],
+      "rangeStrategy": "update-lockfile"
+    },
+    {
+      "matchManagers": ["dockerfile"],
+      "matchPackageNames": ["ubuntu"],
+      "allowedVersions": "24.04"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/terraform\\.yml$/"],
+      "matchStrings": ["terraform_version:\\s*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "depNameTemplate": "hashicorp/terraform",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "hashicorp",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    }
+  ]
+}
