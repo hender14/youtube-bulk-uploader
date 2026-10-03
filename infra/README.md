@@ -18,10 +18,13 @@ Tests use a mock Google provider with no cloud credentials or cloud resources.
 - Video and state buckets are private, with public-access prevention and soft
   delete disabled. Runtime object permissions apply only to those buckets.
 - Terraform creates OAuth secret metadata, not secret versions or secret values.
-  Runtime access and add-version permissions apply only to that secret.
-- Cloud Run creation is opt-in and requires an image digest. Its minimum is zero
-  instances and maximum is one; it runs `serve` on port 8080. Do not enable it
-  until an actual web image exists. No public invoker is granted.
+   Runtime access and add-version permissions apply only to that secret. A
+   separate OAuth-client secret is readable by the runtime but cannot be changed
+   by the application.
+- Cloud Run creation is opt-in and requires an image digest, HTTPS callback URL,
+   and exactly one allowed Google account. Its minimum is zero instances and
+   maximum is one; it runs `serve` on port 8080. Its public invoker permits access
+   to the OAuth redirect; application-level Google account checks protect data.
 
 Administrator security and reviewed code are the trust boundary. Protect main,
 version tags, and the `production` Environment, including required reviewers and
@@ -60,9 +63,12 @@ ignored by Git and must remain access-controlled.
 5. Copy the `github_production_variables` output to the GitHub `production`
    Environment. These identifiers are not private keys. Configure approval and
    tag restrictions separately before a production workflow is enabled.
-6. Create the Web OAuth client and callback registration. Add secrets and OAuth
-   tokens as Secret Manager versions through a secure flow outside Terraform.
-   The empty secret does not implement Web OAuth or token refresh.
+6. Create the Web OAuth client and register the exact HTTPS callback URL. Set
+   `oauth_redirect_uri` and exactly one `oauth_allowed_emails` value. Add a JSON
+   OAuth client configuration (`client_id`, `client_secret`) to the
+   `oauth_client_secret` resource using a secure out-of-band method. The token
+   secret starts empty; the first successful OAuth callback writes its version.
+   Never place OAuth values in Terraform variables, state, or repository files.
 
 Use a protected, dedicated backend for shared Terraform state. The application
 state bucket expires objects after 30 days and must never be the Terraform
@@ -79,8 +85,8 @@ file and YouTube video are unaffected.
 Terraform ignores image changes after initial Cloud Run creation so reviewed tag
 deployments can own image updates; other service settings remain Terraform-owned.
 The deployment workflow is not implemented yet. It must build reviewed source,
-not execute an externally supplied ELF. Existing public invoker permissions are
-not revoked by this configuration: review IAM before using an existing service.
+not execute an externally supplied ELF. Review IAM before adopting any existing
+service because Terraform only manages the invoker permission it declares.
 
 There is no load balancer, NAT, or reserved IP. Registry, storage, secret access,
 and Cloud Run may still incur charges. Budget alerts are not hard spending caps.

@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, ensure};
 
+pub mod web;
 pub mod youtube;
 
 pub fn acknowledged_offset(range: Option<&str>, file_size: u64) -> Result<u64> {

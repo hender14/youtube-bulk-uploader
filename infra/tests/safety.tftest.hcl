@@ -28,13 +28,19 @@ run "safe_defaults" {
     condition     = google_artifact_registry_repository.images.docker_config[0].immutable_tags
     error_message = "Release image tags must be immutable."
   }
+  assert {
+    condition     = google_secret_manager_secret_iam_member.runtime_oauth_client.role == "roles/secretmanager.secretAccessor"
+    error_message = "Only the runtime account should read the OAuth client secret."
+  }
 }
 
 run "reject_unpinned_image" {
   command = plan
   variables {
-    enable_cloud_run = true
-    cloud_run_image  = "example.invalid/image:latest"
+    enable_cloud_run     = true
+    cloud_run_image      = "example.invalid/image:latest"
+    oauth_redirect_uri   = "https://uploader.example.test/oauth/callback"
+    oauth_allowed_emails = ["owner@example.test"]
   }
   expect_failures = [var.cloud_run_image]
 }
@@ -42,8 +48,10 @@ run "reject_unpinned_image" {
 run "opt_in_cloud_run_limits" {
   command = plan
   variables {
-    enable_cloud_run = true
-    cloud_run_image  = "example.invalid/web@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    enable_cloud_run     = true
+    cloud_run_image      = "example.invalid/web@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    oauth_redirect_uri   = "https://uploader.example.test/oauth/callback"
+    oauth_allowed_emails = ["owner@example.test"]
   }
   assert {
     condition     = length(google_cloud_run_v2_service.app) == 1
@@ -56,5 +64,9 @@ run "opt_in_cloud_run_limits" {
   assert {
     condition     = google_cloud_run_v2_service.app[0].template[0].containers[0].args[0] == "serve" && google_cloud_run_v2_service.app[0].template[0].containers[0].ports[0].container_port == 8080
     error_message = "The service must use the web command and expected port."
+  }
+  assert {
+    condition     = google_cloud_run_v2_service_iam_member.public_oauth_entry[0].member == "allUsers" && google_cloud_run_v2_service_iam_member.public_oauth_entry[0].role == "roles/run.invoker"
+    error_message = "The OAuth callback must be publicly reachable; app-level Google account allowlisting is the access control."
   }
 }

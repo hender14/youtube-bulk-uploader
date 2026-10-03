@@ -15,6 +15,7 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
+    Serve,
     Inventory,
     Playlists,
     Video {
@@ -86,8 +87,12 @@ fn main() -> Result<()> {
         )
         .join(".config/yt-uploader/token.json"),
     };
+    if matches!(args.command, Command::Serve) {
+        return yt_uploader_rs::web::serve();
+    }
     let mut youtube = YouTube::from_token_file(&token_path)?;
     let result = match args.command {
+        Command::Serve => unreachable!(),
         Command::Inventory => youtube.inventory()?,
         Command::Playlists => json!(youtube.playlists()?),
         Command::Video { video_id } => youtube.video(&video_id)?,
