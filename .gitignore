@@ -27,3 +27,10 @@ __pycache__/
 /rust/target/
 /token.json
 gha-creds-*.json
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+crash.log
