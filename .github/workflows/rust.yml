@@ -11,16 +11,23 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: rust
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.90.0
-        with:
-          components: rustfmt, clippy
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
       - run: cargo build --locked --release
+      - name: Check executable in deployment runtime
+        run: |
+          set -euo pipefail
+          CONTEXT="$RUNNER_TEMP/yt-uploader-runtime"
+          mkdir -p "$CONTEXT"
+          install -m 755 target/release/yt-uploader-rs "$CONTEXT/yt-uploader-rs"
+          docker build --file Dockerfile.release --tag yt-uploader-runtime "$CONTEXT"
+          docker run --rm yt-uploader-runtime --version
