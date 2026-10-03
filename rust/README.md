@@ -93,3 +93,14 @@ in source or build arguments: ELF and release notes become public on publication
 The release workflow does not deploy to GCP. The later deployment stage must
 build from trusted, reviewed source rather than execute an externally supplied
 ELF, and require separate production approval and narrowly scoped OIDC access.
+
+CI and release builds use Ubuntu 24.04, matching `Dockerfile.release`. Both
+workflows run the executable inside that runtime image before publishing.
+The isolated Docker context contains only the executable, never OAuth files.
+Rustup reads the compiler and components from `rust-toolchain.toml`; workflow
+files do not duplicate that version. The image runs the CLI as a non-root user;
+an HTTP server and GCP deployment are not implemented yet.
+
+Local development can use Ubuntu 26.04. Do not publish its native ELF as the
+Ubuntu 24.04 release artifact: it may require newer glibc symbols. Publish only
+the CI-built artifact verified inside the matching runtime container.
