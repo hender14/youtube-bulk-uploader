@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/rust.yml
+
+  release:
+    needs: checks
+    runs-on: ubuntu-22.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.90.0
+      - name: Validate tag and source commit
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git merge-base --is-ancestor HEAD origin/main
+          cargo metadata --locked --no-deps --format-version 1 --manifest-path rust/Cargo.toml |
+            python3 -c 'import json, os, sys; package = next(item for item in json.load(sys.stdin)["packages"] if item["name"] == "yt-uploader-rs"); assert "v" + package["version"] == os.environ["RELEASE_TAG"], "Tag must match Cargo version"'
+      - name: Build release executable
+        run: cargo build --manifest-path rust/Cargo.toml --locked --release --bin yt-uploader-rs
+      - name: Prepare ELF and checksum
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          install -m 755 rust/target/release/yt-uploader-rs artifacts/yt-uploader-rs-linux-x86_64
+          readelf -h artifacts/yt-uploader-rs-linux-x86_64 | grep -q 'Class:.*ELF64'
+          readelf -h artifacts/yt-uploader-rs-linux-x86_64 | grep -q 'Machine:.*X86-64'
+          artifacts/yt-uploader-rs-linux-x86_64 --version
+          cd artifacts
+          sha256sum yt-uploader-rs-linux-x86_64 > SHA256SUMS
+          sha256sum --check --strict SHA256SUMS
+      - name: Create draft release with automatic notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            artifacts/yt-uploader-rs-linux-x86_64 artifacts/SHA256SUMS \
+            --verify-tag --draft --generate-notes --title "$RELEASE_TAG"
