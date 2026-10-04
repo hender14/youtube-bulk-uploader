@@ -202,7 +202,7 @@ fn send(
         .with_header(header("Referrer-Policy", "no-referrer")?)
         .with_header(header(
             "Content-Security-Policy",
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://storage.googleapis.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://developers.google.com; connect-src 'self' https://storage.googleapis.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
         )?);
     request
         .respond(response)
@@ -574,6 +574,7 @@ fn privacy_policy(request: Request) -> Result<()> {
 <p>ログイン確認に <code>openid</code> と <code>email</code>、YouTubeへのアップロードとチャンネル管理に <code>https://www.googleapis.com/auth/youtube.upload</code> および <code>https://www.googleapis.com/auth/youtube.force-ssl</code> を使用します。OAuth同意画面で許可する前に要求scopeをご確認ください。</p>
 <h2>利用目的と外部サービス</h2>
 <p>情報は、ログイン認証、利用者の指示による動画アップロード、playlistへの追加、アップロード状態の確認・再開のみに利用します。動画とOAuth tokenはGoogle Cloud Storage、Secret Manager、Cloud Runに保存または処理され、YouTube Data APIを通じて利用者のYouTubeチャンネルに送信されます。広告目的の追跡や第三者への販売は行いません。</p>
+<p>Googleサービスでの情報の取り扱いについては、<a href="https://policies.google.com/privacy">Google Privacy Policy</a>をご確認ください。</p>
 <h2>保管と削除</h2>
 <ul><li>動画は非公開のCloud Storage bucketに一時保管し、YouTube側でアップロードと公開範囲を確認した後にアプリが削除します。放棄された動画は最長7日後のlifecycle cleanup対象です。</li><li>再開用の状態recordは非公開bucketに保管され、30日後に削除されます。</li><li>OAuth refresh tokenはSecret Managerに保管され、利用者がアクセスを取り消すか、削除依頼が処理されるまで保持します。</li><li>session cookieはsecure/HttpOnly属性付きで、最長7日間有効です。</li></ul>
 <p>Googleアカウントの接続は<a href="https://myaccount.google.com/connections">Googleアカウントのサードパーティ接続管理</a>から取り消せます。サーバー上のtokenや関連recordの削除を依頼する場合は<a href="https://github.com/hender14/youtube-bulk-uploader/issues/new">GitHub Issues</a>を利用してください。Issuesは公開されるため、メールアドレス、video URL、token、secretなどの個人情報・認証情報は投稿しないでください。依頼を受けた運営者が、許可アカウントに対応する認証情報と状態recordを削除します。</p>
@@ -629,6 +630,7 @@ $('#playlist-toggle').addEventListener('change',event=>$('#playlist').disabled=!
 $('#privacy').addEventListener('change',event=>$('#audit').classList.toggle('visible',event.target.value!=='private'));
 $('#upload-form').addEventListener('submit',submit);
 $('#logout').addEventListener('click',()=>location.assign('/logout'));
+const uploadTitle=$('.upload h2');const youtubeAttribution=document.createElement('a');youtubeAttribution.href='https://www.youtube.com/';youtubeAttribution.setAttribute('aria-label','YouTube');youtubeAttribution.style.cssText='display:inline-flex;align-items:center;margin:0 0 16px';const youtubeLogo=document.createElement('img');youtubeLogo.src='https://developers.google.com/static/youtube/images/developed-with-youtube-sentence-case-dark.png';youtubeLogo.alt='Developed with YouTube';youtubeLogo.width=165;youtubeLogo.style.height='auto';youtubeAttribution.append(youtubeLogo);uploadTitle.insertAdjacentElement('afterend',youtubeAttribution);
 const legalFooter=document.createElement('nav');legalFooter.setAttribute('aria-label','法的情報');legalFooter.style.cssText='display:flex;gap:16px;justify-content:flex-end;padding:16px 0;color:#163e36';for(const [href,label] of [['/privacy-policy','プライバシーポリシー'],['/terms-of-service','利用規約']]){const link=document.createElement('a');link.href=href;link.textContent=label;legalFooter.append(link)}document.querySelector('main').append(legalFooter);
 showJobs();for(const item of pending())if(!['completed','failed'].includes(item.status))refreshJob(item.id);
 api('/api/inventory').then(data=>{const videos=data.videos||[],playlists=data.playlists||[];$('#content').hidden=false;$('#inventory-status').remove();$('#channel').textContent=data.channel?.snippet?.title||'';$('#video-count').textContent=String(videos.length);$('#playlist-count').textContent=String(playlists.length);for(const video of videos){const row=document.createElement('tr');for(const value of [video.snippet?.title,video.status?.privacyStatus,video.processingDetails?.processingStatus]){const cell=document.createElement('td');cell.textContent=value||'不明';row.append(cell)}$('#videos').append(row)}for(const playlist of playlists){const option=document.createElement('option');option.value=playlist.id;option.textContent=playlist.snippet?.title||playlist.id;$('#playlist').append(option);const row=document.createElement('tr');for(const value of [playlist.snippet?.title,playlist.status?.privacyStatus]){const cell=document.createElement('td');cell.textContent=value||'不明';row.append(cell)}$('#playlists').append(row)}}).catch(error=>setStatus($('#inventory-status'),error.message));"#;
@@ -1365,6 +1367,10 @@ mod tests {
                 .to_str()
                 .unwrap()
                 .contains("https://storage.googleapis.com")
+                && dashboard.headers()["Content-Security-Policy"]
+                    .to_str()
+                    .unwrap()
+                    .contains("img-src 'self' https://developers.google.com")
         );
         let html = dashboard.text().unwrap();
         assert!(html.contains("Creator Video Transfer"));
@@ -1377,12 +1383,15 @@ mod tests {
         assert!(javascript_body.contains("Content-Range"));
         assert!(javascript_body.contains("/privacy-policy"));
         assert!(javascript_body.contains("/terms-of-service"));
+        assert!(javascript_body.contains("developed-with-youtube-sentence-case-dark.png"));
+        assert!(javascript_body.contains("https://www.youtube.com/"));
         let privacy = client.get(format!("{base}/privacy-policy")).send().unwrap();
         assert!(privacy.status().is_success());
         let privacy_body = privacy.text().unwrap();
         assert!(privacy_body.contains("Creator Video Transfer"));
         assert!(!privacy_body.contains("YouTube Uploader"));
         assert!(privacy_body.contains("https://www.googleapis.com/auth/youtube.upload"));
+        assert!(privacy_body.contains("https://policies.google.com/privacy"));
         assert!(privacy_body.contains("GitHub Issues"));
         let terms = client
             .get(format!("{base}/terms-of-service"))
