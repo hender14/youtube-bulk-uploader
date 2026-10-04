@@ -29,6 +29,10 @@ run "safe_defaults" {
     error_message = "Release image tags must be immutable."
   }
   assert {
+    condition     = google_service_account_iam_member.act_as_runtime.role == "roles/iam.serviceAccountUser" && google_service_account_iam_member.act_as_worker.role == "roles/iam.serviceAccountUser"
+    error_message = "The deploy identity must act as only the web runtime and worker service accounts."
+  }
+  assert {
     condition     = google_secret_manager_secret_iam_member.runtime_oauth_client.role == "roles/secretmanager.secretAccessor"
     error_message = "Only the runtime account should read the OAuth client secret."
   }
