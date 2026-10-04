@@ -27,10 +27,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install toolchain from rust-toolchain.toml
-        working-directory: rust
+        working-directory: app
         run: rustup show
       - name: Validate tag and source commit
-        working-directory: rust
+        working-directory: app
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
@@ -40,21 +40,21 @@ jobs:
           cargo metadata --locked --no-deps --format-version 1 |
             python3 -c 'import json, os, sys; package = next(item for item in json.load(sys.stdin)["packages"] if item["name"] == "yt-uploader-rs"); assert "v" + package["version"] == os.environ["RELEASE_TAG"], "Tag must match Cargo version"'
       - name: Build release executable
-        working-directory: rust
+        working-directory: app
         run: cargo build --locked --release --bin yt-uploader-rs
       - name: Check executable in deployment runtime
         run: |
           set -euo pipefail
           CONTEXT="$RUNNER_TEMP/yt-uploader-runtime"
           mkdir -p "$CONTEXT"
-          install -m 755 rust/target/release/yt-uploader-rs "$CONTEXT/yt-uploader-rs"
-          docker build --file rust/Dockerfile.release --tag yt-uploader-runtime "$CONTEXT"
+          install -m 755 app/target/release/yt-uploader-rs "$CONTEXT/yt-uploader-rs"
+          docker build --file app/Dockerfile.release --tag yt-uploader-runtime "$CONTEXT"
           docker run --rm yt-uploader-runtime --version
       - name: Prepare ELF and checksum
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          install -m 755 rust/target/release/yt-uploader-rs artifacts/yt-uploader-rs-linux-x86_64
+          install -m 755 app/target/release/yt-uploader-rs artifacts/yt-uploader-rs-linux-x86_64
           readelf -h artifacts/yt-uploader-rs-linux-x86_64 | grep -q 'Class:.*ELF64'
           readelf -h artifacts/yt-uploader-rs-linux-x86_64 | grep -q 'Machine:.*X86-64'
           artifacts/yt-uploader-rs-linux-x86_64 --version
