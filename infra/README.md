@@ -2,8 +2,9 @@
 
 Terraform manages an existing dedicated, billing-enabled project. It does not
 create a project, billing account, OAuth client, GitHub Environment, release tag,
-or running uploader by default. No real GCP plan or apply has been performed.
-Tests use a mock Google provider with no cloud credentials or cloud resources.
+or running uploader by default. CI validates Terraform and uses a mock Google
+provider; it never performs a live plan or apply. Real changes are administrator
+initiated and reviewed.
 
 ## Trust and resources
 
@@ -69,13 +70,37 @@ ignored by Git and must remain access-controlled.
 5. Copy the `github_production_variables` output to the GitHub `production`
    Environment variables. These identifiers are not private keys. Require
    administrator approval and restrict deployment to protected version tags.
-6. Create the Web OAuth client and register the exact HTTPS callback URL. Set
-   `oauth_redirect_uri` and exactly one `oauth_allowed_emails` value. Add a JSON
-   OAuth client configuration (`client_id`, `client_secret`) to the
-   `oauth_client_secret` resource using a secure out-of-band method. The token
-   secret starts empty; the first successful OAuth callback writes its version.
-    Keep `youtube_audit_confirmed=false` until YouTube confirms the project audit.
-    Never place OAuth values in Terraform variables, state, or repository files.
+6. Follow [First Cloud Run deployment](#first-cloud-run-deployment) for the
+   staged OAuth setup. The token secret starts empty; the first successful OAuth
+   callback writes its version. Keep `youtube_audit_confirmed=false` until
+   YouTube confirms the project audit. Never place OAuth values in Terraform
+   variables, state, or repository files.
+
+## First Cloud Run deployment
+
+The production tag workflow always builds and publishes an immutable image. If
+the `production` Environment variable `GCP_CLOUD_RUN_READY` is not exactly
+`true`, it reports the image digest and skips Cloud Run updates. Use this for the
+first release, then copy the digest from the workflow summary into
+`cloud_run_image` in the ignored local `terraform.tfvars`.
+
+The web process reads its OAuth client JSON while starting, but the Cloud Run
+URL needed by the final OAuth redirect URI is only known after service creation.
+For the initial creation only, add a temporary JSON version such as
+`{"client_id":"bootstrap-placeholder","client_secret":"bootstrap-placeholder"}`
+to the `yt-uploader-oauth-client` secret. Set `enable_cloud_run=true`, the
+digest-pinned `cloud_run_image`, a temporary HTTPS `oauth_redirect_uri`, and the
+single allowed account in local `terraform.tfvars`. Plan and review, then apply
+to create the service and Job. OAuth will not work with the placeholder.
+
+After Terraform outputs the service URL, create the Google Web OAuth client with
+the exact redirect URI `https://SERVICE_URL/oauth/callback`, replace the
+temporary Secret Manager version with JSON containing the real `client_id` and
+`client_secret`, and set `oauth_redirect_uri` to that exact URL. Apply the
+reviewed Terraform change and test login. Only after the service and Job are
+working, set `GCP_CLOUD_RUN_READY=true` in the `production` Environment; later
+version tags will then update both resources. Keep this variable unset or false
+until that point.
 
 Use a protected, dedicated backend for shared Terraform state. The application
 state bucket expires objects after 30 days and must never be the Terraform
@@ -92,12 +117,12 @@ file and YouTube video are unaffected.
 Terraform ignores image changes after initial Cloud Run creation so reviewed tag
 deployments can own image updates; other service settings remain Terraform-owned.
 The tag-triggered deployment workflow reruns CI, verifies that the tag points to
-main and matches Cargo's version, builds and publishes the image from that source,
-then updates the web service and worker Job by image digest after production
-Environment approval. Terraform must first create them (`enable_cloud_run=true`)
-and their runtime configuration. The workflow does not create infrastructure or
-run Terraform apply. Review IAM before adopting any existing service because
-Terraform only manages the invoker permission it declares.
+main and matches Cargo's version, then builds and publishes the image from that
+source. After `GCP_CLOUD_RUN_READY=true`, it also updates the web service and
+worker Job by image digest after production Environment approval. The workflow
+does not create infrastructure or run Terraform apply. Review IAM before
+adopting any existing service because Terraform only manages the invoker
+permission it declares.
 
 There is no load balancer, NAT, or reserved IP. Registry, storage, secret access,
 and Cloud Run may still incur charges. Budget alerts are not hard spending caps.
