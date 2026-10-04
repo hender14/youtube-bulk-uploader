@@ -1,6 +1,6 @@
 # Rust YouTube uploader
 
-This binary runs without Python and provides a local CLI plus a Cloud Run web
+This binary provides a local CLI plus a Cloud Run web
 uploader. The browser sends resumable chunks directly to Cloud Storage; a
 separate Cloud Run Job streams them to YouTube and removes the staged object
 after YouTube confirms completion.
@@ -21,8 +21,8 @@ cargo build --locked --release
 
 The CLI uses an authorized-user OAuth JSON containing `client_id`,
 `client_secret`, and `refresh_token`. By default the binary uses
-`~/.config/yt-uploader/token.json`, shared with the local Python app. Override
-it with `YOUTUBE_TOKEN_FILE` or `--token-file`. It refreshes the access token
+`~/.config/yt-uploader/token.json`. Override it with `YOUTUBE_TOKEN_FILE` or
+`--token-file`. It refreshes the access token
 directly with Google. Keep the token file outside the repository with
 owner-only permissions.
 
