@@ -1,7 +1,16 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "enabledManagers": ["cargo", "rust-toolchain", "github-actions", "terraform", "dockerfile", "custom.regex"],
+  "extends": [
+    "config:recommended"
+  ],
+  "enabledManagers": [
+    "cargo",
+    "rust-toolchain",
+    "github-actions",
+    "terraform",
+    "dockerfile",
+    "custom.regex"
+  ],
   "minimumReleaseAge": "7 days",
   "minimumReleaseAgeBehaviour": "timestamp-required",
   "internalChecksFilter": "strict",
@@ -11,7 +20,9 @@
   "prConcurrentLimit": 3,
   "prHourlyLimit": 2,
   "ignoreUnstable": true,
-  "lockFileMaintenance": { "enabled": false },
+  "lockFileMaintenance": {
+    "enabled": false
+  },
   "commitMessageAction": "更新",
   "commitMessageTopic": "{{depName}}",
   "commitMessageExtra": "{{newVersion}} へ",
@@ -30,24 +41,37 @@
   },
   "packageRules": [
     {
-      "matchUpdateTypes": ["major"],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "dependencyDashboardApproval": true
     },
     {
-      "matchManagers": ["cargo", "terraform"],
+      "matchManagers": [
+        "cargo",
+        "terraform"
+      ],
       "rangeStrategy": "update-lockfile"
     },
     {
-      "matchManagers": ["dockerfile"],
-      "matchPackageNames": ["ubuntu"],
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchPackageNames": [
+        "ubuntu"
+      ],
       "allowedVersions": "24.04"
     }
   ],
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.github/workflows/terraform\\.yml$/"],
-      "matchStrings": ["terraform_version:\\s*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/terraform\\.yml$/"
+      ],
+      "matchStrings": [
+        "terraform_version:\\s*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)"
+      ],
       "depNameTemplate": "hashicorp/terraform",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "hashicorp",

@@ -13,7 +13,7 @@ __pycache__/
 *.mp4
 *.mov
 *.mkv
-/rust/target/
+/app/target/
 /token.json
 gha-creds-*.json
 **/.terraform/

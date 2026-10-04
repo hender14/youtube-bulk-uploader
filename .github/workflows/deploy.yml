@@ -38,10 +38,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install toolchain from rust-toolchain.toml
-        working-directory: rust
+        working-directory: app
         run: rustup show
       - name: Validate protected source tag
-        working-directory: rust
+        working-directory: app
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
@@ -68,14 +68,14 @@ jobs:
           IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPOSITORY}/yt-uploader"
           CONTEXT="$RUNNER_TEMP/yt-uploader-runtime"
           mkdir -p "$CONTEXT"
-          install -m 755 rust/target/release/yt-uploader-rs "$CONTEXT/yt-uploader-rs"
+          install -m 755 app/target/release/yt-uploader-rs "$CONTEXT/yt-uploader-rs"
           if gcloud artifacts docker images describe "${IMAGE}:${RELEASE_TAG}" --format='value(image_summary.digest)' >/dev/null 2>&1; then
             docker pull "${IMAGE}:${RELEASE_TAG}"
             SOURCE_REVISION="$(docker image inspect --format='{{index .Config.Labels "org.opencontainers.image.revision"}}' "${IMAGE}:${RELEASE_TAG}")"
             [[ "$SOURCE_REVISION" == "$GITHUB_SHA" ]]
           else
             docker build --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-              --file rust/Dockerfile.release --tag "${IMAGE}:${RELEASE_TAG}" "$CONTEXT"
+              --file app/Dockerfile.release --tag "${IMAGE}:${RELEASE_TAG}" "$CONTEXT"
             docker push "${IMAGE}:${RELEASE_TAG}"
           fi
           DIGEST="$(gcloud artifacts docker images describe "${IMAGE}:${RELEASE_TAG}" --format='value(image_summary.digest)')"
