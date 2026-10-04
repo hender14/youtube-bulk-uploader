@@ -50,6 +50,9 @@ jobs:
           git merge-base --is-ancestor HEAD origin/main
           cargo metadata --locked --no-deps --format-version 1 |
             python3 -c 'import json, os, sys; package = next(item for item in json.load(sys.stdin)["packages"] if item["name"] == "yt-uploader-rs"); assert "v" + package["version"] == os.environ["RELEASE_TAG"], "Tag must match Cargo version"'
+      - name: Build release executable
+        working-directory: app
+        run: cargo build --locked --release --bin yt-uploader-rs
       - name: Authenticate to Google Cloud with OIDC
         uses: google-github-actions/auth@v2
         with:
