@@ -9,8 +9,8 @@ variables {
 run "safe_defaults" {
   command = plan
   assert {
-    condition     = length(google_cloud_run_v2_service.app) == 0
-    error_message = "Cloud Run must not be created before the web image exists."
+    condition     = length(google_cloud_run_v2_service.app) == 0 && length(google_cloud_run_v2_job.upload) == 0
+    error_message = "Cloud Run service and Job must remain disabled by default."
   }
   assert {
     condition     = google_storage_bucket.videos.public_access_prevention == "enforced" && google_storage_bucket.state.public_access_prevention == "enforced"
@@ -68,5 +68,25 @@ run "opt_in_cloud_run_limits" {
   assert {
     condition     = google_cloud_run_v2_service_iam_member.public_oauth_entry[0].member == "allUsers" && google_cloud_run_v2_service_iam_member.public_oauth_entry[0].role == "roles/run.invoker"
     error_message = "The OAuth callback must be publicly reachable; app-level Google account allowlisting is the access control."
+  }
+  assert {
+    condition     = google_storage_bucket.videos.cors[0].origin[0] == "https://uploader.example.test" && contains(google_storage_bucket.videos.cors[0].method, "PUT") && contains(google_storage_bucket.videos.cors[0].response_header, "Range")
+    error_message = "The browser must be able to send resumable chunks directly to its Cloud Storage bucket."
+  }
+  assert {
+    condition     = length(google_cloud_run_v2_job.upload) == 1 && google_cloud_run_v2_job.upload[0].template[0].template[0].containers[0].args[0] == "worker" && google_cloud_run_v2_job.upload[0].template[0].template[0].max_retries == 2
+    error_message = "The uploader Job must run the worker and retry resumably."
+  }
+  assert {
+    condition     = contains(google_project_iam_custom_role.upload_job_runner.permissions, "run.jobs.runWithOverrides")
+    error_message = "The custom Job runner role must allow only the required override permission."
+  }
+  assert {
+    condition     = contains(google_project_iam_custom_role.web_video_storage.permissions, "storage.objects.create") && !contains(google_project_iam_custom_role.web_video_storage.permissions, "storage.objects.delete") && contains(google_project_iam_custom_role.worker_video_storage.permissions, "storage.objects.delete")
+    error_message = "Only the background worker may delete staged video objects."
+  }
+  assert {
+    condition     = one([for item in google_cloud_run_v2_service.app[0].template[0].containers[0].env : item.value if item.name == "CLOUD_RUN_JOB_RESOURCE"]) == "projects/yt-uploader-test/locations/asia-northeast1/jobs/yt-uploader-worker"
+    error_message = "The web service must receive the fully-qualified worker Job resource name."
   }
 }

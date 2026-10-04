@@ -16,15 +16,21 @@ Tests use a mock Google provider with no cloud credentials or cloud resources.
   the dedicated project. It is not granted access to the OAuth secret.
 - The registry uses immutable image tags.
 - Video and state buckets are private, with public-access prevention and soft
-  delete disabled. Runtime object permissions apply only to those buckets.
+   delete disabled. Bucket-specific custom roles let the web app create video
+   objects without reading or deleting them; only the worker can read/delete
+   staged videos. State objects can be read and generation-conditionally updated.
+   The video bucket accepts resumable PUT requests only from the HTTPS web origin,
+   allowing direct browser upload without buffering media in Cloud Run.
 - Terraform creates OAuth secret metadata, not secret versions or secret values.
    Runtime access and add-version permissions apply only to that secret. A
    separate OAuth-client secret is readable by the runtime but cannot be changed
    by the application.
 - Cloud Run creation is opt-in and requires an image digest, HTTPS callback URL,
-   and exactly one allowed Google account. Its minimum is zero instances and
-   maximum is one; it runs `serve` on port 8080. Its public invoker permits access
-   to the OAuth redirect; application-level Google account checks protect data.
+  and exactly one allowed Google account. Its minimum is zero instances and
+  maximum is one; it runs `serve` on port 8080 and starts a separate `worker` Job.
+  The public invoker permits OAuth redirects; app-level account checks protect data.
+   The trusted web runtime can execute this fixed Job with per-execution overrides;
+   protect its image and deployment path accordingly.
 
 Administrator security and reviewed code are the trust boundary. Protect main,
 version tags, and the `production` Environment, including required reviewers and
@@ -68,7 +74,8 @@ ignored by Git and must remain access-controlled.
    OAuth client configuration (`client_id`, `client_secret`) to the
    `oauth_client_secret` resource using a secure out-of-band method. The token
    secret starts empty; the first successful OAuth callback writes its version.
-   Never place OAuth values in Terraform variables, state, or repository files.
+    Keep `youtube_audit_confirmed=false` until YouTube confirms the project audit.
+    Never place OAuth values in Terraform variables, state, or repository files.
 
 Use a protected, dedicated backend for shared Terraform state. The application
 state bucket expires objects after 30 days and must never be the Terraform
@@ -86,12 +93,11 @@ Terraform ignores image changes after initial Cloud Run creation so reviewed tag
 deployments can own image updates; other service settings remain Terraform-owned.
 The tag-triggered deployment workflow reruns CI, verifies that the tag points to
 main and matches Cargo's version, builds and publishes the image from that source,
-then updates the existing Cloud Run service by image digest after production
-Environment approval. Terraform must first create the service
-(`enable_cloud_run=true`) and its runtime configuration. The workflow does not
-create infrastructure or run Terraform apply. Review IAM before adopting any
-existing service because Terraform only manages the invoker permission it
-declares.
+then updates the web service and worker Job by image digest after production
+Environment approval. Terraform must first create them (`enable_cloud_run=true`)
+and their runtime configuration. The workflow does not create infrastructure or
+run Terraform apply. Review IAM before adopting any existing service because
+Terraform only manages the invoker permission it declares.
 
 There is no load balancer, NAT, or reserved IP. Registry, storage, secret access,
 and Cloud Run may still incur charges. Budget alerts are not hard spending caps.

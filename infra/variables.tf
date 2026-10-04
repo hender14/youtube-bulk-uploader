@@ -75,6 +75,12 @@ variable "oauth_allowed_emails" {
   }
 }
 
+variable "youtube_audit_confirmed" {
+  type        = bool
+  default     = false
+  description = "Administrator-confirmed YouTube API compliance audit status; keep false until Google confirms approval."
+}
+
 variable "temporary_video_days" {
   type        = number
   default     = 7

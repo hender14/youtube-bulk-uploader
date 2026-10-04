@@ -1,8 +1,9 @@
 # Rust YouTube uploader
 
-This binary runs without Python and provides a local CLI plus an early Cloud Run
-web interface for Google OAuth and read-only channel inventory. Browser uploads,
-remote upload jobs, and deployment automation remain follow-up work.
+This binary runs without Python and provides a local CLI plus a Cloud Run web
+uploader. The browser sends resumable chunks directly to Cloud Storage; a
+separate Cloud Run Job streams them to YouTube and removes the staged object
+after YouTube confirms completion.
 
 ## Build and check
 
@@ -45,10 +46,16 @@ to a Secret Manager version containing JSON with `client_id` and `client_secret`
 browser is redirected to Google automatically. The callback uses state, PKCE,
 and an OIDC nonce, checks Google's tokeninfo audience and verified email, then
 creates a signed, HttpOnly, SameSite session. The authorization response uses a
-form POST so its short-lived code is not placed in request URLs. Set
+form POST so its short-lived code is not placed in request URLs. After GCS
+resumable upload completes, the service starts a durable worker Job. The worker
+reads 8 MiB byte ranges, stores YouTube offsets and session URIs in the private
+state bucket, verifies video privacy, adds the selected playlist by ID, then
+deletes only the staged GCS object. The original PC file and YouTube video are
+never deleted. Set
 `COOKIE_SECURE=false` only for localhost session cookies; the OAuth state cookie
-always requires Secure transport. The web interface currently exposes read-only
-inventory.
+always requires Secure transport. The dashboard shows read-only channel
+inventory plus the upload workflow. Non-private uploads stay disabled until
+YouTube's project audit is confirmed by the administrator.
 
 Playlist creation is private and explicit. Reuse existing playlists by ID;
 the CLI does not silently select a same-title playlist. Playlist membership is
@@ -85,10 +92,10 @@ replaced: inspect YouTube before deciding to create a fresh upload. A completed
 upload whose visibility verification fails is still recorded, preventing
 accidental reuploads; use inventory and privacy commands to resolve it.
 
-The local source video is never deleted. Cloud temporary-object deletion,
-remote state retention, direct browser-to-Storage uploads, Cloud Run Jobs, and
-automated deployment are still to be implemented. No cloud deployment is
-performed by this CLI.
+The local source video is never deleted. Web upload state expires after 30 days;
+abandoned staged videos have a seven-day fallback lifecycle rule. Completed
+videos are deleted from staging immediately after independent YouTube privacy
+readback. No cloud deployment is performed by the local CLI.
 
 ## Tagged releases
 
@@ -106,7 +113,8 @@ No OAuth credentials are provided to the release build. Do not embed secrets
 in source or build arguments: ELF and release notes become public on publication.
 
 The separate tag-triggered deployment workflow rebuilds the same reviewed tag
-from source and updates Cloud Run by Artifact Registry digest. It requires the
+from source and updates both the web service and worker Job by Artifact Registry
+digest. It requires the
 `production` Environment's approval, GCP variables, protected version tags,
 numeric repository/owner IDs in Terraform, and a pre-created Cloud Run service.
 It never deploys the public ELF release artifact or applies Terraform.

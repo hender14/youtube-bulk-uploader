@@ -8,7 +8,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct Credentials {
     client_id: String,
     client_secret: String,
@@ -20,6 +20,8 @@ pub struct YouTube {
     token: String,
     base_url: String,
     token_path: Option<PathBuf>,
+    refresh_credentials: Option<Credentials>,
+    production_upload: bool,
     refreshed: Instant,
 }
 
@@ -112,39 +114,44 @@ impl YouTube {
             .connect_timeout(Duration::from_secs(15))
             .timeout(Duration::from_secs(60))
             .build()?;
+        let token = Self::refresh_token(&http, &credentials)?;
+        Ok(Self {
+            http,
+            token,
+            base_url: "https://www.googleapis.com/youtube/v3".into(),
+            token_path: None,
+            refresh_credentials: Some(credentials),
+            production_upload: true,
+            refreshed: Instant::now(),
+        })
+    }
+
+    fn refresh_token(http: &Client, credentials: &Credentials) -> Result<String> {
         let response = execute(http.post("https://oauth2.googleapis.com/token").form(&[
             ("grant_type", "refresh_token"),
             ("client_id", credentials.client_id.as_str()),
             ("client_secret", credentials.client_secret.as_str()),
             ("refresh_token", credentials.refresh_token.as_str()),
         ]))?;
-        let token = response["access_token"]
+        response["access_token"]
             .as_str()
-            .context("Missing OAuth access token")?
-            .to_owned();
-        Ok(Self {
-            http,
-            token,
-            base_url: "https://www.googleapis.com/youtube/v3".into(),
-            token_path: None,
-            refreshed: Instant::now(),
-        })
+            .context("Missing OAuth access token")
+            .map(str::to_owned)
     }
 
     fn upload_request(&mut self, method: Method, uri: &str) -> Result<RequestBuilder> {
         if self.refreshed.elapsed() >= Duration::from_secs(3000)
-            && let Some(path) = &self.token_path
+            && let Some(credentials) = self.refresh_credentials.as_ref()
         {
-            let refreshed = Self::from_token_file(path)?;
-            self.token = refreshed.token;
+            let token = Self::refresh_token(&self.http, credentials)?;
+            self.token = token;
             self.refreshed = Instant::now();
         }
         let url = reqwest::Url::parse(uri)?;
         let host = url.host_str().context("Upload session missing host")?;
         let google = url.scheme() == "https"
             && (host == "googleapis.com" || host.ends_with(".googleapis.com"));
-        let local_test =
-            self.token_path.is_none() && uri.starts_with(&format!("{}/", self.base_url));
+        let local_test = !self.production_upload && uri.starts_with(&format!("{}/", self.base_url));
         ensure!(google || local_test, "Refusing non-Google upload endpoint");
         ensure!(
             url.username().is_empty() && url.password().is_none(),
@@ -262,7 +269,7 @@ impl YouTube {
                     .any(|video| video["snippet"]["title"] == options.title),
                 "A video with this title exists; review it before uploading"
             );
-            let uri = if self.token_path.is_some() {
+            let uri = if self.production_upload {
                 "https://www.googleapis.com/upload/youtube/v3/videos".into()
             } else {
                 format!("{}/upload", self.base_url)
@@ -333,6 +340,130 @@ impl YouTube {
             "Upload completed but privacy differs; refresh inventory"
         );
         Ok(json!({"id":video_id,"already_uploaded":false,"video":verified}))
+    }
+
+    pub fn upload_from_storage(
+        &mut self,
+        video_bucket: &str,
+        state_bucket: &str,
+        record: &mut crate::cloud_storage::UploadRecord,
+        mut generation: u64,
+        audited: bool,
+    ) -> Result<(Value, u64)> {
+        ensure!(record.file_size > 0, "Video file is empty");
+        ensure!(
+            record.title.chars().count() <= 100 && !record.title.trim().is_empty(),
+            "Title must contain 1 to 100 characters"
+        );
+        ensure!(
+            record.description.len() <= 5000,
+            "Description exceeds 5000 bytes"
+        );
+        ensure!(
+            ["private", "unlisted", "public"].contains(&record.privacy.as_str()),
+            "Invalid video privacy"
+        );
+        ensure!(
+            record.privacy == "private" || audited,
+            "Non-private uploads require administrator audit confirmation"
+        );
+        if record.video_id.is_none() {
+            if record.youtube_session_uri.is_none() {
+                let inventory = self.inventory()?;
+                ensure!(
+                    !inventory["videos"]
+                        .as_array()
+                        .context("Video inventory missing")?
+                        .iter()
+                        .any(|video| video["snippet"]["title"] == record.title),
+                    "A video with this title exists; review it before uploading"
+                );
+                let uri = "https://www.googleapis.com/upload/youtube/v3/videos";
+                let response = self
+                    .upload_request(Method::POST, uri)?
+                    .query(&[("uploadType", "resumable"), ("part", "snippet,status")])
+                    .header("X-Upload-Content-Length", record.file_size.to_string())
+                    .header("X-Upload-Content-Type", "application/octet-stream")
+                    .json(&json!({"snippet":{"title":record.title,"description":record.description,"categoryId":"22"},"status":{"privacyStatus":record.privacy,"selfDeclaredMadeForKids":record.made_for_kids}}))
+                    .send()
+                    .map_err(|error| error.without_url())?;
+                ensure!(
+                    response.status().is_success(),
+                    "Upload session creation failed (HTTP {})",
+                    response.status().as_u16()
+                );
+                let session_uri = response
+                    .headers()
+                    .get("Location")
+                    .context("Upload session URI missing")?
+                    .to_str()?
+                    .to_owned();
+                record.youtube_session_uri = Some(session_uri);
+                record.status = "uploading_to_youtube".into();
+                generation = crate::cloud_storage::save_upload(state_bucket, record, generation)?;
+            }
+            let session_uri = record
+                .youtube_session_uri
+                .as_deref()
+                .context("YouTube resumable session missing")?;
+            let response = self
+                .upload_request(Method::PUT, session_uri)?
+                .header("Content-Length", "0")
+                .header("Content-Range", format!("bytes */{}", record.file_size))
+                .body(Vec::new())
+                .send()
+                .map_err(|error| error.without_url())?;
+            let (offset, completed) = Self::upload_result(response, record.file_size)?;
+            record.youtube_uploaded_bytes = offset;
+            record.video_id = completed;
+            generation = crate::cloud_storage::save_upload(state_bucket, record, generation)?;
+        }
+        while record.video_id.is_none() && record.youtube_uploaded_bytes < record.file_size {
+            let first_byte = record.youtube_uploaded_bytes;
+            let length = (record.file_size - first_byte).min(8 * 1024 * 1024) as usize;
+            let chunk =
+                crate::cloud_storage::read_video_range(video_bucket, record, first_byte, length)?;
+            let session_uri = record
+                .youtube_session_uri
+                .as_deref()
+                .context("YouTube resumable session missing")?;
+            let response = self
+                .upload_request(Method::PUT, session_uri)?
+                .header("Content-Type", "application/octet-stream")
+                .header(
+                    "Content-Range",
+                    format!(
+                        "bytes {}-{}/{}",
+                        first_byte,
+                        first_byte + length as u64 - 1,
+                        record.file_size
+                    ),
+                )
+                .body(chunk)
+                .send()
+                .map_err(|error| error.without_url())?;
+            let (offset, completed) = Self::upload_result(response, record.file_size)?;
+            ensure!(
+                offset > first_byte,
+                "No YouTube upload progress acknowledged"
+            );
+            record.youtube_uploaded_bytes = offset;
+            record.video_id = completed;
+            generation = crate::cloud_storage::save_upload(state_bucket, record, generation)?;
+        }
+        let video_id = record
+            .video_id
+            .as_deref()
+            .context("YouTube upload incomplete; retry the cloud job")?;
+        record.youtube_session_uri = None;
+        record.status = "youtube_uploaded".into();
+        generation = crate::cloud_storage::save_upload(state_bucket, record, generation)?;
+        let verified = self.video(video_id)?;
+        ensure!(
+            verified["status"]["privacyStatus"] == record.privacy,
+            "YouTube upload completed but privacy could not be verified"
+        );
+        Ok((verified, generation))
     }
 
     fn request(&self, method: Method, resource: &str) -> RequestBuilder {
@@ -548,6 +679,8 @@ mod tests {
             token: "fake-token".into(),
             base_url: base,
             token_path: None,
+            refresh_credentials: None,
+            production_upload: false,
             refreshed: Instant::now(),
         };
         let handle = std::thread::spawn(move || {
@@ -675,6 +808,8 @@ mod tests {
             token: "fake-token".into(),
             base_url: "http://127.0.0.1:1".into(),
             token_path: None,
+            refresh_credentials: None,
+            production_upload: false,
             refreshed: Instant::now(),
         };
         let options = UploadOptions {
@@ -702,6 +837,8 @@ mod tests {
             token: "fake-token".into(),
             base_url: "https://www.googleapis.com/youtube/v3".into(),
             token_path: None,
+            refresh_credentials: None,
+            production_upload: false,
             refreshed: Instant::now(),
         };
         assert!(
@@ -726,6 +863,8 @@ mod tests {
             token: "fake-token".into(),
             base_url: format!("http://{}", server.server_addr()),
             token_path: None,
+            refresh_credentials: None,
+            production_upload: false,
             refreshed: Instant::now(),
         };
         let handle = std::thread::spawn(move || {
@@ -754,6 +893,8 @@ mod tests {
             token: "fake-token".into(),
             base_url: format!("http://{}", server.server_addr()),
             token_path: None,
+            refresh_credentials: None,
+            production_upload: false,
             refreshed: Instant::now(),
         };
         let handle = std::thread::spawn(move || {
@@ -777,6 +918,8 @@ mod tests {
             token: "fake-token".into(),
             base_url: format!("http://{}", server.server_addr()),
             token_path: None,
+            refresh_credentials: None,
+            production_upload: false,
             refreshed: Instant::now(),
         };
 

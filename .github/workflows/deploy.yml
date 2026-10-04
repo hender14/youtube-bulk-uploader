@@ -27,7 +27,9 @@ jobs:
       GCP_REGION: ${{ vars.GCP_REGION }}
       GCP_ARTIFACT_REPOSITORY: ${{ vars.GCP_ARTIFACT_REPOSITORY }}
       GCP_RUN_SERVICE: ${{ vars.GCP_RUN_SERVICE }}
+      GCP_RUN_JOB: ${{ vars.GCP_RUN_JOB }}
       GCP_RUNTIME_SERVICE_ACCOUNT: ${{ vars.GCP_RUNTIME_SERVICE_ACCOUNT }}
+      GCP_WORKER_SERVICE_ACCOUNT: ${{ vars.GCP_WORKER_SERVICE_ACCOUNT }}
       GCP_DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
       GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
     steps:
@@ -88,4 +90,13 @@ jobs:
             --region "$GCP_REGION" \
             --image "$DEPLOY_IMAGE" \
             --service-account "$GCP_RUNTIME_SERVICE_ACCOUNT" \
+            --quiet
+      - name: Update Cloud Run upload Job
+        run: |
+          set -euo pipefail
+          gcloud run jobs update "$GCP_RUN_JOB" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --image "$DEPLOY_IMAGE" \
+            --service-account "$GCP_WORKER_SERVICE_ACCOUNT" \
             --quiet
