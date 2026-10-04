@@ -12,6 +12,9 @@ initiated and reviewed.
 - GitHub OIDC requires the numeric repository and owner IDs, repository name,
   a `refs/tags/v*` ref, and the `production` Environment subject. Ordinary main
   pushes and fork PRs do not match these conditions.
+- GitHub repositories created after 2026-07-15 use immutable OIDC subjects that
+   include both numeric IDs. Terraform derives this subject from the repository
+   and owner IDs; keep those values current if the repository is transferred.
 - Deployment can write only the application registry, impersonate only the
   runtime account, and use Run Developer and Service Usage Consumer roles on
   the dedicated project. It is not granted access to the OAuth secret.

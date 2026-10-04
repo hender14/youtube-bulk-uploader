@@ -21,7 +21,7 @@ run "safe_defaults" {
     error_message = "Temporary videos must not remain billed through soft delete."
   }
   assert {
-    condition     = strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "assertion.repository_id == '123456'") && strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "assertion.repository_owner_id == '654321'") && strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "environment:production") && strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "refs/tags/v")
+    condition     = strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "assertion.repository_id == '123456'") && strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "assertion.repository_owner_id == '654321'") && strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "assertion.sub == 'repo:hender14@654321/youtube-bulk-uploader@123456:environment:production'") && strcontains(google_iam_workload_identity_pool_provider.github.attribute_condition, "refs/tags/v")
     error_message = "OIDC must require numeric repository/owner IDs, a release tag, and production."
   }
   assert {

@@ -1,4 +1,5 @@
 locals {
+  github_oidc_subject = "repo:${split("/", var.github_repository)[0]}@${var.github_owner_id}/${split("/", var.github_repository)[1]}@${var.github_repository_id}:environment:production"
   services = toset([
     "run.googleapis.com",
     "artifactregistry.googleapis.com",
@@ -86,7 +87,7 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "assertion.repository_owner_id == '${var.github_owner_id}'",
     "assertion.repository == '${var.github_repository}'",
     "assertion.ref.startsWith('refs/tags/v')",
-    "assertion.sub == 'repo:${var.github_repository}:environment:production'",
+    "assertion.sub == '${local.github_oidc_subject}'",
   ])
   oidc {
     issuer_uri = "https://token.actions.githubusercontent.com"
