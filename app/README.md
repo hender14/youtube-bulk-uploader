@@ -57,6 +57,11 @@ always requires Secure transport. The dashboard shows read-only channel
 inventory plus the upload workflow. Non-private uploads stay disabled until
 YouTube's project audit is confirmed by the administrator.
 
+The live web service exposes public `/privacy-policy` and `/terms-of-service`
+pages for OAuth review. The signed-in dashboard links to both pages. Deletion
+requests can be opened through the repository's GitHub Issues; Issues are public,
+so never include account identifiers, video URLs, OAuth tokens, or secrets.
+
 Playlist creation is private and explicit. Reuse existing playlists by ID;
 the CLI does not silently select a same-title playlist. Playlist membership is
 checked before insertion. These list-then-write guards do not guarantee atomic

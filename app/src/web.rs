@@ -548,6 +548,62 @@ fn dashboard(request: Request) -> Result<()> {
     )
 }
 
+fn legal_page(request: Request, title: &str, content: &str) -> Result<()> {
+    let mut body = String::from(
+        "<!doctype html><html lang=\"ja\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>",
+    );
+    body.push_str(title);
+    body.push_str("</title><style>body{margin:0;background:#f2f5f0;color:#1c2e2a;font:16px/1.7 Georgia,'Yu Mincho',serif}header{background:#163e36;color:#fffefa;padding:18px max(24px,calc((100vw - 900px)/2))}header a,footer a{color:inherit}main{max-width:900px;margin:32px auto;padding:0 24px 48px}h1{font-size:28px;font-weight:500}h2{font-size:20px;margin-top:30px}footer{border-top:1px solid #cbd5ca;padding-top:18px;margin-top:36px}a{color:#145b4b}li{margin:8px 0}</style></head><body><header><a href=\"/\">YouTube Uploader</a></header><main><h1>");
+    body.push_str(title);
+    body.push_str("</h1>");
+    body.push_str(content);
+    body.push_str("<footer><a href=\"/privacy-policy\">プライバシーポリシー</a> · <a href=\"/terms-of-service\">利用規約</a> · <a href=\"/\">アップローダーへ戻る</a></footer></main></body></html>");
+    send(request, 200, body, "text/html; charset=utf-8", &[])
+}
+
+fn privacy_policy(request: Request) -> Result<()> {
+    legal_page(
+        request,
+        "Privacy Policy / プライバシーポリシー",
+        r#"
+<p>最終更新日: 2026年10月4日</p>
+<p>YouTube Uploader（以下「本サービス」）は、許可された1つのGoogleアカウントから、利用者自身のYouTubeチャンネルへ動画をアップロードするサービスです。本ポリシーは、本サービスが扱う情報とその利用方法を説明します。</p>
+<h2>取得する情報</h2>
+<ul><li>Google OAuthで確認されたメールアドレス、認証用refresh token</li><li>アップロードする動画ファイル、ファイル名・サイズ・形式、タイトル、説明、公開範囲、視聴者設定、選択した再生リストID</li><li>アップロード再開に必要な一時session情報、処理状態、YouTube video ID</li></ul>
+<h2>利用するGoogle API scopes</h2>
+<p>ログイン確認に <code>openid</code> と <code>email</code>、YouTubeへのアップロードとチャンネル管理に <code>https://www.googleapis.com/auth/youtube.upload</code> および <code>https://www.googleapis.com/auth/youtube.force-ssl</code> を使用します。OAuth同意画面で許可する前に要求scopeをご確認ください。</p>
+<h2>利用目的と外部サービス</h2>
+<p>情報は、ログイン認証、利用者の指示による動画アップロード、playlistへの追加、アップロード状態の確認・再開のみに利用します。動画とOAuth tokenはGoogle Cloud Storage、Secret Manager、Cloud Runに保存または処理され、YouTube Data APIを通じて利用者のYouTubeチャンネルに送信されます。広告目的の追跡や第三者への販売は行いません。</p>
+<h2>保管と削除</h2>
+<ul><li>動画は非公開のCloud Storage bucketに一時保管し、YouTube側でアップロードと公開範囲を確認した後にアプリが削除します。放棄された動画は最長7日後のlifecycle cleanup対象です。</li><li>再開用の状態recordは非公開bucketに保管され、30日後に削除されます。</li><li>OAuth refresh tokenはSecret Managerに保管され、利用者がアクセスを取り消すか、削除依頼が処理されるまで保持します。</li><li>session cookieはsecure/HttpOnly属性付きで、最長7日間有効です。</li></ul>
+<p>Googleアカウントの接続は<a href="https://myaccount.google.com/connections">Googleアカウントのサードパーティ接続管理</a>から取り消せます。サーバー上のtokenや関連recordの削除を依頼する場合は<a href="https://github.com/hender14/youtube-bulk-uploader/issues/new">GitHub Issues</a>を利用してください。Issuesは公開されるため、メールアドレス、video URL、token、secretなどの個人情報・認証情報は投稿しないでください。依頼を受けた運営者が、許可アカウントに対応する認証情報と状態recordを削除します。</p>
+<h2>公開範囲と利用者の責任</h2>
+<p>アップロードは非公開が既定です。YouTubeによるproject監査が確認されるまでは、限定公開・公開アップロードを本サービスが拒否します。利用者は投稿する動画の権利、視聴者設定、YouTube利用規約およびコミュニティガイドラインへの適合に責任を負います。</p>
+<h2>セキュリティと変更</h2>
+<p>本サービスはGoogleアカウントのallowlist、HTTPS、署名付きHttpOnly cookie、Google Cloud IAMおよび非公開bucketを使ってアクセスを制限します。本ポリシーを更新した場合は、このページに改定日を掲載します。</p>
+"#,
+    )
+}
+
+fn terms_of_service(request: Request) -> Result<()> {
+    legal_page(
+        request,
+        "Terms of Service / 利用規約",
+        r#"
+<p>最終更新日: 2026年10月4日</p>
+<p>本サービスを利用することで、この利用規約に同意したものとします。本サービスは、許可されたGoogleアカウントから利用者自身のYouTubeチャンネルへ動画を送るためのものです。</p>
+<h2>利用条件</h2>
+<ul><li>利用者はGoogle/YouTubeアカウントの所有者または正式な権限を持つ代理人である必要があります。</li><li>アップロードする動画を利用する権利を持ち、YouTubeの利用規約、API Services Terms of Service、Developer Policies、コミュニティガイドラインを守ってください。</li><li>動画が子ども向けかどうかは正確に設定してください。</li><li>動画は非公開でアップロードされます。YouTubeのproject監査確認前は、限定公開・公開の指定は利用できません。</li></ul>
+<h2>データと第三者サービス</h2>
+<p>本サービスは動画を一時的にGoogle Cloud Storageへ保管し、処理完了後に削除します。中断された動画は最長7日、再開用recordは最長30日保持される場合があります。OAuth、Google Cloud、YouTubeの各サービスは、それぞれの利用規約にも従います。</p>
+<h2>可用性と責任</h2>
+<p>本サービスは現状有姿で提供され、常時利用可能であることや特定の処理結果を保証しません。ネットワークやYouTube APIの制限により、アップロードが中断・失敗する場合があります。元の端末上の動画は本サービスによって削除されません。</p>
+<h2>利用停止と削除</h2>
+<p>Googleアカウントの接続は<a href="https://myaccount.google.com/connections">Googleアカウント設定</a>から取り消せます。サーバー上の情報の削除依頼は<a href="https://github.com/hender14/youtube-bulk-uploader/issues/new">GitHub Issues</a>へ送れます。Issuesは公開されるため、個人情報や認証情報を記載しないでください。</p>
+"#,
+    )
+}
+
 const APP_JS: &str = r#"'use strict';
 const $=selector=>document.querySelector(selector);
 const pendingKey='yt-uploader.pending.v1';
@@ -573,6 +629,7 @@ $('#playlist-toggle').addEventListener('change',event=>$('#playlist').disabled=!
 $('#privacy').addEventListener('change',event=>$('#audit').classList.toggle('visible',event.target.value!=='private'));
 $('#upload-form').addEventListener('submit',submit);
 $('#logout').addEventListener('click',()=>location.assign('/logout'));
+const legalFooter=document.createElement('nav');legalFooter.setAttribute('aria-label','法的情報');legalFooter.style.cssText='display:flex;gap:16px;justify-content:flex-end;padding:16px 0;color:#163e36';for(const [href,label] of [['/privacy-policy','プライバシーポリシー'],['/terms-of-service','利用規約']]){const link=document.createElement('a');link.href=href;link.textContent=label;legalFooter.append(link)}document.querySelector('main').append(legalFooter);
 showJobs();for(const item of pending())if(!['completed','failed'].includes(item.status))refreshJob(item.id);
 api('/api/inventory').then(data=>{const videos=data.videos||[],playlists=data.playlists||[];$('#content').hidden=false;$('#inventory-status').remove();$('#channel').textContent=data.channel?.snippet?.title||'';$('#video-count').textContent=String(videos.length);$('#playlist-count').textContent=String(playlists.length);for(const video of videos){const row=document.createElement('tr');for(const value of [video.snippet?.title,video.status?.privacyStatus,video.processingDetails?.processingStatus]){const cell=document.createElement('td');cell.textContent=value||'不明';row.append(cell)}$('#videos').append(row)}for(const playlist of playlists){const option=document.createElement('option');option.value=playlist.id;option.textContent=playlist.snippet?.title||playlist.id;$('#playlist').append(option);const row=document.createElement('tr');for(const value of [playlist.snippet?.title,playlist.status?.privacyStatus]){const cell=document.createElement('td');cell.textContent=value||'不明';row.append(cell)}$('#playlists').append(row)}}).catch(error=>setStatus($('#inventory-status'),error.message));"#;
 
@@ -1045,6 +1102,8 @@ fn serve_request(request: Request, config: &Config) -> Result<()> {
         return retry_upload(request, id, &email, config);
     }
     match (request.method(), url.path()) {
+        (&Method::Get, "/privacy-policy") => privacy_policy(request),
+        (&Method::Get, "/terms-of-service") => terms_of_service(request),
         (&Method::Get, "/healthz") => send(request, 200, "ok".into(), "text/plain", &[]),
         (&Method::Get, "/") => {
             if authenticated_email(&request, config).is_some() {
@@ -1289,7 +1348,7 @@ mod tests {
         let server = Server::http("127.0.0.1:0").unwrap();
         let base = format!("http://{}", server.server_addr());
         let handle = std::thread::spawn(move || {
-            for _ in 0..2 {
+            for _ in 0..4 {
                 let request = server.recv().unwrap();
                 serve_request(request, &config).unwrap();
             }
@@ -1312,7 +1371,21 @@ mod tests {
         assert!(html.contains("id=\"playlist-toggle\""));
         assert!(html.contains("id=\"files\" type=\"file\" accept=\"video/*\" multiple"));
         let javascript = client.get(format!("{base}/app.js")).send().unwrap();
-        assert!(javascript.text().unwrap().contains("Content-Range"));
+        let javascript_body = javascript.text().unwrap();
+        assert!(javascript_body.contains("Content-Range"));
+        assert!(javascript_body.contains("/privacy-policy"));
+        assert!(javascript_body.contains("/terms-of-service"));
+        let privacy = client.get(format!("{base}/privacy-policy")).send().unwrap();
+        assert!(privacy.status().is_success());
+        let privacy_body = privacy.text().unwrap();
+        assert!(privacy_body.contains("https://www.googleapis.com/auth/youtube.upload"));
+        assert!(privacy_body.contains("GitHub Issues"));
+        let terms = client
+            .get(format!("{base}/terms-of-service"))
+            .send()
+            .unwrap();
+        assert!(terms.status().is_success());
+        assert!(terms.text().unwrap().contains("利用規約"));
         handle.join().unwrap();
     }
 
