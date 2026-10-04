@@ -104,10 +104,12 @@ fn save_record(bucket: &str, record: &UploadRecord, generation: Option<u64>) -> 
         .body(serde_json::to_vec(record)?)
         .send()
         .context("Unable to store upload state")?;
-    ensure!(
-        response.status().is_success(),
-        "Cloud Storage rejected upload state"
-    );
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().unwrap_or_default();
+        let detail = body.chars().take(1024).collect::<String>();
+        anyhow::bail!("Cloud Storage rejected upload state with HTTP {status}: {detail}");
+    }
     let saved: Value = response.json().context("Invalid upload-state response")?;
     saved["generation"]
         .as_str()
@@ -139,10 +141,12 @@ fn start_session(bucket: &str, record: &UploadRecord) -> Result<String> {
         .json(&json!({"name":record.object_name,"contentType":record.content_type}))
         .send()
         .context("Unable to start Cloud Storage upload")?;
-    ensure!(
-        response.status().is_success(),
-        "Cloud Storage rejected upload setup"
-    );
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().unwrap_or_default();
+        let detail = body.chars().take(1024).collect::<String>();
+        anyhow::bail!("Cloud Storage rejected upload setup with HTTP {status}: {detail}");
+    }
     let location = response
         .headers()
         .get("Location")
