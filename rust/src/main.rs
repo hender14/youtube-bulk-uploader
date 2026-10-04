@@ -16,6 +16,7 @@ struct Args {
 #[derive(Subcommand)]
 enum Command {
     Serve,
+    Worker,
     Inventory,
     Playlists,
     Video {
@@ -90,9 +91,13 @@ fn main() -> Result<()> {
     if matches!(args.command, Command::Serve) {
         return yt_uploader_rs::web::serve();
     }
+    if matches!(args.command, Command::Worker) {
+        return yt_uploader_rs::web::run_worker();
+    }
     let mut youtube = YouTube::from_token_file(&token_path)?;
     let result = match args.command {
         Command::Serve => unreachable!(),
+        Command::Worker => unreachable!(),
         Command::Inventory => youtube.inventory()?,
         Command::Playlists => json!(youtube.playlists()?),
         Command::Video { video_id } => youtube.video(&video_id)?,

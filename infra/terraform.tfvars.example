@@ -3,3 +3,4 @@ github_repository_id = "123456"
 github_owner_id      = "654321"
 region               = "asia-northeast1"
 enable_cloud_run     = false
+youtube_audit_confirmed = false

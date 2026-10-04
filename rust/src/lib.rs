@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, ensure};
 
+pub mod cloud_storage;
 pub mod web;
 pub mod youtube;
 
