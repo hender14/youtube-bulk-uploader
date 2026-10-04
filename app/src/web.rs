@@ -687,7 +687,12 @@ fn create_upload(mut request: Request, email: &str, config: &Config) -> Result<(
         video_id: None,
         status: "uploading_to_storage".into(),
     };
-    let record = match crate::cloud_storage::begin_upload(video_bucket, state_bucket, record) {
+    let record = match crate::cloud_storage::begin_upload(
+        video_bucket,
+        state_bucket,
+        record,
+        &config.redirect_uri,
+    ) {
         Ok(record) => record,
         Err(error) => {
             eprintln!("Secure upload session initialization failed for upload {id}: {error:#}");

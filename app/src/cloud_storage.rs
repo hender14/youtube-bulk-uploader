@@ -68,6 +68,15 @@ fn validate_session_uri(uri: &str) -> Result<Url> {
     Ok(url)
 }
 
+fn browser_origin(redirect_uri: &str) -> Result<String> {
+    let url = Url::parse(redirect_uri).context("Invalid OAuth redirect URL")?;
+    ensure!(
+        url.scheme() == "https" || url.host_str() == Some("localhost"),
+        "Browser upload origin must use HTTPS except on localhost"
+    );
+    Ok(url.origin().ascii_serialization())
+}
+
 fn object_url(bucket: &str, object_name: &str) -> Result<Url> {
     let mut url = Url::parse("https://storage.googleapis.com/storage/v1/")?;
     url.path_segments_mut()
@@ -124,7 +133,7 @@ fn save_record(bucket: &str, record: &UploadRecord, generation: Option<u64>) -> 
         .context("Cloud Storage omitted upload-state generation")
 }
 
-fn start_session(bucket: &str, record: &UploadRecord) -> Result<String> {
+fn start_session(bucket: &str, record: &UploadRecord, origin: &str) -> Result<String> {
     validate_id(&record.id)?;
     ensure!(record.file_size > 0, "Video file is empty");
     ensure!(
@@ -140,6 +149,7 @@ fn start_session(bucket: &str, record: &UploadRecord) -> Result<String> {
     let response = http()?
         .post(url)
         .bearer_auth(token)
+        .header("Origin", origin)
         .header("X-Upload-Content-Type", &record.content_type)
         .header("X-Upload-Content-Length", record.file_size)
         .json(&json!({"name":record.object_name,"contentType":record.content_type}))
@@ -164,10 +174,12 @@ pub fn begin_upload(
     video_bucket: &str,
     state_bucket: &str,
     mut record: UploadRecord,
+    redirect_uri: &str,
 ) -> Result<UploadRecord> {
     validate_id(&record.id)?;
     ensure!(record.object_name == format!("incoming/{}", record.id));
-    record.session_uri = start_session(video_bucket, &record)?;
+    let origin = browser_origin(redirect_uri)?;
+    record.session_uri = start_session(video_bucket, &record, &origin)?;
     save_record(state_bucket, &record, None)?;
     Ok(record)
 }
@@ -389,5 +401,13 @@ mod tests {
     fn upload_collection_url_has_no_duplicate_slash() {
         let url = upload_collection_url("video-bucket").unwrap();
         assert_eq!(url.path(), "/upload/storage/v1/b/video-bucket/o");
+    }
+
+    #[test]
+    fn browser_origin_uses_only_the_oauth_url_origin() {
+        assert_eq!(
+            browser_origin("https://uploader.example.test/oauth/callback").unwrap(),
+            "https://uploader.example.test"
+        );
     }
 }
