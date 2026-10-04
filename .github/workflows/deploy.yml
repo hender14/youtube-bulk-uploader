@@ -82,7 +82,9 @@ jobs:
           [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
           echo "DEPLOY_IMAGE=${IMAGE}@${DIGEST}" >> "$GITHUB_ENV"
           echo "Published ${IMAGE}@${DIGEST} from ${GITHUB_SHA}"
+          printf 'Published image: `%s` (source `%s`)\n' "${IMAGE}@${DIGEST}" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
       - name: Update existing Cloud Run service
+        if: vars.GCP_CLOUD_RUN_READY == 'true'
         run: |
           set -euo pipefail
           gcloud run services update "$GCP_RUN_SERVICE" \
@@ -92,6 +94,7 @@ jobs:
             --service-account "$GCP_RUNTIME_SERVICE_ACCOUNT" \
             --quiet
       - name: Update Cloud Run upload Job
+        if: vars.GCP_CLOUD_RUN_READY == 'true'
         run: |
           set -euo pipefail
           gcloud run jobs update "$GCP_RUN_JOB" \
@@ -100,3 +103,8 @@ jobs:
             --image "$DEPLOY_IMAGE" \
             --service-account "$GCP_WORKER_SERVICE_ACCOUNT" \
             --quiet
+      - name: Report image-only bootstrap
+        if: vars.GCP_CLOUD_RUN_READY != 'true'
+        run: |
+          set -euo pipefail
+          echo "Cloud Run is not marked ready; published ${DEPLOY_IMAGE} without updating a service or Job." >> "$GITHUB_STEP_SUMMARY"
