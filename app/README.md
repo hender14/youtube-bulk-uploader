@@ -1,4 +1,4 @@
-# Rust YouTube uploader
+# Creator Video Transfer
 
 This binary provides a local CLI plus a Cloud Run web
 uploader. The browser sends resumable chunks directly to Cloud Storage; a
