@@ -72,7 +72,17 @@ fn object_url(bucket: &str, object_name: &str) -> Result<Url> {
     let mut url = Url::parse("https://storage.googleapis.com/storage/v1/")?;
     url.path_segments_mut()
         .map_err(|_| anyhow::anyhow!("Invalid Cloud Storage URL"))?
+        .pop_if_empty()
         .extend(["b", bucket, "o", object_name]);
+    Ok(url)
+}
+
+fn upload_collection_url(bucket: &str) -> Result<Url> {
+    let mut url = Url::parse("https://storage.googleapis.com/upload/storage/v1/")?;
+    url.path_segments_mut()
+        .map_err(|_| anyhow::anyhow!("Invalid Cloud Storage upload URL"))?
+        .pop_if_empty()
+        .extend(["b", bucket, "o"]);
     Ok(url)
 }
 
@@ -86,10 +96,7 @@ fn session_record(record: &UploadRecord) -> Result<()> {
 fn save_record(bucket: &str, record: &UploadRecord, generation: Option<u64>) -> Result<u64> {
     session_record(record)?;
     let token = crate::web::metadata_access_token()?;
-    let mut url = Url::parse("https://storage.googleapis.com/upload/storage/v1/")?;
-    url.path_segments_mut()
-        .map_err(|_| anyhow::anyhow!("Invalid Cloud Storage upload URL"))?
-        .extend(["b", bucket, "o"]);
+    let mut url = upload_collection_url(bucket)?;
     url.query_pairs_mut()
         .append_pair("uploadType", "media")
         .append_pair("name", &format!("uploads/{}.json", record.id))
@@ -125,10 +132,7 @@ fn start_session(bucket: &str, record: &UploadRecord) -> Result<String> {
         "Unsupported video content type"
     );
     let token = crate::web::metadata_access_token()?;
-    let mut url = Url::parse("https://storage.googleapis.com/upload/storage/v1/")?;
-    url.path_segments_mut()
-        .map_err(|_| anyhow::anyhow!("Invalid Cloud Storage upload URL"))?
-        .extend(["b", bucket, "o"]);
+    let mut url = upload_collection_url(bucket)?;
     url.query_pairs_mut()
         .append_pair("uploadType", "resumable")
         .append_pair("name", &record.object_name)
@@ -374,6 +378,16 @@ mod tests {
     #[test]
     fn state_object_urls_escape_path_segments() {
         let url = object_url("video-bucket", "uploads/abc.json").unwrap();
+        assert_eq!(
+            url.path(),
+            "/storage/v1/b/video-bucket/o/uploads%2Fabc.json"
+        );
         assert!(url.as_str().contains("uploads%2Fabc.json"));
+    }
+
+    #[test]
+    fn upload_collection_url_has_no_duplicate_slash() {
+        let url = upload_collection_url("video-bucket").unwrap();
+        assert_eq!(url.path(), "/upload/storage/v1/b/video-bucket/o");
     }
 }
