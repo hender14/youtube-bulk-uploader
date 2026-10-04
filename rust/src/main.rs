@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use yt_uploader_rs::youtube::{UploadOptions, YouTube};
 
 #[derive(Parser)]
-#[command(version, about = "YouTube API management without Python")]
+#[command(version, about = "YouTube API management and resumable uploader")]
 struct Args {
     #[arg(long, env = "YOUTUBE_TOKEN_FILE", global = true)]
     token_file: Option<PathBuf>,

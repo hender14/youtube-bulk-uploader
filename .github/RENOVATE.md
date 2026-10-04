@@ -32,5 +32,4 @@ do not silently enable automerge or reduce the cooldown for all updates.
 
 PR titles, introductory text, and table headings use Japanese. Upstream release
 notes and some Renovate-generated messages retain their original language.
-Python dependencies are not managed while the Python implementation is being
-retired. Renovate does not create application release tags or deploy to GCP.
+Renovate does not create application release tags or deploy to GCP.

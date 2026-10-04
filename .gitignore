@@ -1,14 +1,3 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-
 .env
 .secrets/
 *.token.json
@@ -17,13 +6,13 @@ wheels/
 temp_uploads/
 tmp/
 .chrome_profile/
-.streamlit/secrets.toml
+__pycache__/
+*.py[oc]
+.venv/
+.uv/
 *.mp4
 *.mov
 *.mkv
-.venv/
-__pycache__/
-.uv/
 /rust/target/
 /token.json
 gha-creds-*.json
