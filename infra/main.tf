@@ -106,6 +106,12 @@ resource "google_service_account_iam_member" "act_as_runtime" {
   member             = "serviceAccount:${google_service_account.deploy.email}"
 }
 
+resource "google_service_account_iam_member" "act_as_worker" {
+  service_account_id = google_service_account.worker.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.deploy.email}"
+}
+
 resource "google_project_iam_member" "deploy_roles" {
   for_each = toset(["roles/run.developer", "roles/serviceusage.serviceUsageConsumer"])
   project  = var.project_id
