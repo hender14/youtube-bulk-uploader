@@ -638,7 +638,8 @@ fn validate_new_upload(upload: &NewUpload, audit_enabled: bool) -> Result<()> {
 fn create_upload(mut request: Request, email: &str, config: &Config) -> Result<()> {
     let upload = match parse_new_upload(&mut request) {
         Ok(upload) => upload,
-        Err(_) => {
+        Err(error) => {
+            eprintln!("Upload metadata parsing failed: {error:#}");
             return send(
                 request,
                 400,
@@ -688,7 +689,8 @@ fn create_upload(mut request: Request, email: &str, config: &Config) -> Result<(
     };
     let record = match crate::cloud_storage::begin_upload(video_bucket, state_bucket, record) {
         Ok(record) => record,
-        Err(_) => {
+        Err(error) => {
+            eprintln!("Secure upload session initialization failed for upload {id}: {error:#}");
             return send(
                 request,
                 502,
