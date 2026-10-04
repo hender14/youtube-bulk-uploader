@@ -97,9 +97,16 @@ fn execute(request: RequestBuilder) -> Result<Value> {
 
 impl YouTube {
     pub fn from_token_file(path: &Path) -> Result<Self> {
-        let credentials: Credentials =
-            serde_json::from_slice(&std::fs::read(path).context("Unable to read OAuth file")?)
-                .context("OAuth file needs client_id, client_secret and refresh_token")?;
+        let data = std::fs::read(path).context("Unable to read OAuth file")?;
+        Self::from_authorized_user(&data).map(|mut youtube| {
+            youtube.token_path = Some(path.into());
+            youtube
+        })
+    }
+
+    pub fn from_authorized_user(data: &[u8]) -> Result<Self> {
+        let credentials: Credentials = serde_json::from_slice(data)
+            .context("OAuth data needs client_id, client_secret and refresh_token")?;
         let http = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(15))
@@ -119,7 +126,7 @@ impl YouTube {
             http,
             token,
             base_url: "https://www.googleapis.com/youtube/v3".into(),
-            token_path: Some(path.into()),
+            token_path: None,
             refreshed: Instant::now(),
         })
     }

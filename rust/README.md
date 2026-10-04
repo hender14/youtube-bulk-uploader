@@ -1,7 +1,8 @@
 # Rust YouTube uploader
 
-This binary runs without Python. It currently provides a local CLI, not the
-planned Cloud Run web application. Python remains available during migration.
+This binary runs without Python and provides a local CLI plus an early Cloud Run
+web interface for Google OAuth and read-only channel inventory. Browser uploads,
+remote upload jobs, and deployment automation remain follow-up work.
 
 ## Build and check
 
@@ -17,12 +18,12 @@ cargo build --locked --release
 
 ## Authentication and commands
 
-Use an existing authorized-user OAuth JSON containing `client_id`,
+The CLI uses an authorized-user OAuth JSON containing `client_id`,
 `client_secret`, and `refresh_token`. By default the binary uses
 `~/.config/yt-uploader/token.json`, shared with the local Python app. Override
 it with `YOUTUBE_TOKEN_FILE` or `--token-file`. It refreshes the access token
-directly with Google; first-time browser OAuth is not yet implemented in Rust.
-Keep the token file outside the repository with owner-only permissions.
+directly with Google. Keep the token file outside the repository with
+owner-only permissions.
 
 ```sh
 ./target/release/yt-uploader-rs inventory
@@ -33,7 +34,21 @@ Keep the token file outside the repository with owner-only permissions.
 ./target/release/yt-uploader-rs set-privacy VIDEO_ID unlisted
 ./target/release/yt-uploader-rs set-playlist-privacy PLAYLIST_ID unlisted
 ./target/release/yt-uploader-rs upload clip.mp4 --title 'Test clip' --audience not-kids
+./target/release/yt-uploader-rs serve
 ```
+
+`serve` requires `OAUTH_REDIRECT_URI`, `OAUTH_ALLOWED_EMAILS` (exactly one
+verified account), and either `OAUTH_TOKEN_FILE` for local testing or
+`OAUTH_SECRET_RESOURCE` for Cloud Run. Configure `OAUTH_CLIENT_CONFIG_RESOURCE`
+to a Secret Manager version containing JSON with `client_id` and `client_secret`
+(or use `OAUTH_CLIENT_ID` and `OAUTH_CLIENT_SECRET` for local development). The
+browser is redirected to Google automatically. The callback uses state, PKCE,
+and an OIDC nonce, checks Google's tokeninfo audience and verified email, then
+creates a signed, HttpOnly, SameSite session. The authorization response uses a
+form POST so its short-lived code is not placed in request URLs. Set
+`COOKIE_SECURE=false` only for localhost session cookies; the OAuth state cookie
+always requires Secure transport. The web interface currently exposes read-only
+inventory.
 
 Playlist creation is private and explicit. Reuse existing playlists by ID;
 the CLI does not silently select a same-title playlist. Playlist membership is
@@ -71,9 +86,9 @@ upload whose visibility verification fails is still recorded, preventing
 accidental reuploads; use inventory and privacy commands to resolve it.
 
 The local source video is never deleted. Cloud temporary-object deletion,
-remote state retention, direct browser-to-Storage uploads, Web OAuth, and
-Cloud Run Jobs are still to be implemented. No cloud deployment is performed
-by this CLI.
+remote state retention, direct browser-to-Storage uploads, Cloud Run Jobs, and
+automated deployment are still to be implemented. No cloud deployment is
+performed by this CLI.
 
 ## Tagged releases
 
@@ -90,16 +105,16 @@ publishing; GitHub generates the headings and change list, not a translation.
 No OAuth credentials are provided to the release build. Do not embed secrets
 in source or build arguments: ELF and release notes become public on publication.
 
-The release workflow does not deploy to GCP. The later deployment stage must
-build from trusted, reviewed source rather than execute an externally supplied
-ELF, and require separate production approval and narrowly scoped OIDC access.
+The release workflow does not deploy to GCP. A deployment stage must build from
+trusted, reviewed source rather than execute an externally supplied ELF, and
+require separate production approval and narrowly scoped OIDC access.
 
 CI and release builds use Ubuntu 24.04, matching `Dockerfile.release`. Both
 workflows run the executable inside that runtime image before publishing.
 The isolated Docker context contains only the executable, never OAuth files.
 Rustup reads the compiler and components from `rust-toolchain.toml`; workflow
-files do not duplicate that version. The image runs the CLI as a non-root user;
-an HTTP server and GCP deployment are not implemented yet.
+files do not duplicate that version. The image runs the CLI/server as a non-root
+user. GCP deployment is not implemented yet.
 
 Local development can use Ubuntu 26.04. Do not publish its native ELF as the
 Ubuntu 24.04 release artifact: it may require newer glibc symbols. Publish only

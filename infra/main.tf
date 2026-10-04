@@ -158,10 +158,27 @@ resource "google_secret_manager_secret" "oauth" {
   depends_on = [google_project_service.required]
 }
 
+resource "google_secret_manager_secret" "oauth_client" {
+  secret_id = "yt-uploader-oauth-client"
+  replication {
+    auto {}
+  }
+  lifecycle {
+    prevent_destroy = true
+  }
+  depends_on = [google_project_service.required]
+}
+
 resource "google_secret_manager_secret_iam_member" "runtime_oauth" {
   for_each  = toset(["roles/secretmanager.secretAccessor", "roles/secretmanager.secretVersionAdder"])
   secret_id = google_secret_manager_secret.oauth.id
   role      = each.value
+  member    = "serviceAccount:${google_service_account.runtime.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "runtime_oauth_client" {
+  secret_id = google_secret_manager_secret.oauth_client.id
+  role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
 }
 
@@ -201,10 +218,30 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "OAUTH_SECRET_RESOURCE"
         value = google_secret_manager_secret.oauth.id
       }
+      env {
+        name  = "OAUTH_CLIENT_CONFIG_RESOURCE"
+        value = google_secret_manager_secret.oauth_client.id
+      }
+      env {
+        name  = "OAUTH_REDIRECT_URI"
+        value = var.oauth_redirect_uri
+      }
+      env {
+        name  = "OAUTH_ALLOWED_EMAILS"
+        value = join(",", var.oauth_allowed_emails)
+      }
     }
   }
   lifecycle {
     ignore_changes = [template[0].containers[0].image]
   }
   depends_on = [google_project_service.required]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "public_oauth_entry" {
+  count    = var.enable_cloud_run ? 1 : 0
+  location = google_cloud_run_v2_service.app[0].location
+  name     = google_cloud_run_v2_service.app[0].name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
 }

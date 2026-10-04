@@ -55,6 +55,26 @@ variable "cloud_run_image" {
   }
 }
 
+variable "oauth_redirect_uri" {
+  type        = string
+  default     = ""
+  description = "HTTPS OAuth callback URL registered with the Google Web OAuth client."
+  validation {
+    condition     = !var.enable_cloud_run || can(regex("^https://[^/]+/.+", var.oauth_redirect_uri))
+    error_message = "Enabling Cloud Run requires a registered HTTPS OAuth callback URL."
+  }
+}
+
+variable "oauth_allowed_emails" {
+  type        = list(string)
+  default     = []
+  description = "Google account email addresses allowed to access the uploader."
+  validation {
+    condition     = !var.enable_cloud_run || (length(var.oauth_allowed_emails) == 1 && alltrue([for email in var.oauth_allowed_emails : can(regex("^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$", email))]))
+    error_message = "Enabling Cloud Run requires exactly one valid allowed Google account email."
+  }
+}
+
 variable "temporary_video_days" {
   type        = number
   default     = 7
