@@ -61,8 +61,8 @@ ignored by Git and must remain access-controlled.
    Run `terraform apply review.tfplan` only after explicit approval. No automated
    apply or live plan is included in this PR.
 5. Copy the `github_production_variables` output to the GitHub `production`
-   Environment. These identifiers are not private keys. Configure approval and
-   tag restrictions separately before a production workflow is enabled.
+   Environment variables. These identifiers are not private keys. Require
+   administrator approval and restrict deployment to protected version tags.
 6. Create the Web OAuth client and register the exact HTTPS callback URL. Set
    `oauth_redirect_uri` and exactly one `oauth_allowed_emails` value. Add a JSON
    OAuth client configuration (`client_id`, `client_secret`) to the
@@ -84,9 +84,14 @@ file and YouTube video are unaffected.
 
 Terraform ignores image changes after initial Cloud Run creation so reviewed tag
 deployments can own image updates; other service settings remain Terraform-owned.
-The deployment workflow is not implemented yet. It must build reviewed source,
-not execute an externally supplied ELF. Review IAM before adopting any existing
-service because Terraform only manages the invoker permission it declares.
+The tag-triggered deployment workflow reruns CI, verifies that the tag points to
+main and matches Cargo's version, builds and publishes the image from that source,
+then updates the existing Cloud Run service by image digest after production
+Environment approval. Terraform must first create the service
+(`enable_cloud_run=true`) and its runtime configuration. The workflow does not
+create infrastructure or run Terraform apply. Review IAM before adopting any
+existing service because Terraform only manages the invoker permission it
+declares.
 
 There is no load balancer, NAT, or reserved IP. Registry, storage, secret access,
 and Cloud Run may still incur charges. Budget alerts are not hard spending caps.

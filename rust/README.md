@@ -105,16 +105,18 @@ publishing; GitHub generates the headings and change list, not a translation.
 No OAuth credentials are provided to the release build. Do not embed secrets
 in source or build arguments: ELF and release notes become public on publication.
 
-The release workflow does not deploy to GCP. A deployment stage must build from
-trusted, reviewed source rather than execute an externally supplied ELF, and
-require separate production approval and narrowly scoped OIDC access.
+The separate tag-triggered deployment workflow rebuilds the same reviewed tag
+from source and updates Cloud Run by Artifact Registry digest. It requires the
+`production` Environment's approval, GCP variables, protected version tags,
+numeric repository/owner IDs in Terraform, and a pre-created Cloud Run service.
+It never deploys the public ELF release artifact or applies Terraform.
 
 CI and release builds use Ubuntu 24.04, matching `Dockerfile.release`. Both
 workflows run the executable inside that runtime image before publishing.
 The isolated Docker context contains only the executable, never OAuth files.
 Rustup reads the compiler and components from `rust-toolchain.toml`; workflow
 files do not duplicate that version. The image runs the CLI/server as a non-root
-user. GCP deployment is not implemented yet.
+user. The deployment workflow rebuilds this image from the protected tag.
 
 Local development can use Ubuntu 26.04. Do not publish its native ELF as the
 Ubuntu 24.04 release artifact: it may require newer glibc symbols. Publish only
