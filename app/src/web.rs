@@ -553,7 +553,7 @@ fn legal_page(request: Request, title: &str, content: &str) -> Result<()> {
         "<!doctype html><html lang=\"ja\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>",
     );
     body.push_str(title);
-    body.push_str("</title><style>body{margin:0;background:#f2f5f0;color:#1c2e2a;font:16px/1.7 Georgia,'Yu Mincho',serif}header{background:#163e36;color:#fffefa;padding:18px max(24px,calc((100vw - 900px)/2))}header a,footer a{color:inherit}main{max-width:900px;margin:32px auto;padding:0 24px 48px}h1{font-size:28px;font-weight:500}h2{font-size:20px;margin-top:30px}footer{border-top:1px solid #cbd5ca;padding-top:18px;margin-top:36px}a{color:#145b4b}li{margin:8px 0}</style></head><body><header><a href=\"/\">YouTube Uploader</a></header><main><h1>");
+    body.push_str("</title><style>body{margin:0;background:#f2f5f0;color:#1c2e2a;font:16px/1.7 Georgia,'Yu Mincho',serif}header{background:#163e36;color:#fffefa;padding:18px max(24px,calc((100vw - 900px)/2))}header a,footer a{color:inherit}main{max-width:900px;margin:32px auto;padding:0 24px 48px}h1{font-size:28px;font-weight:500}h2{font-size:20px;margin-top:30px}footer{border-top:1px solid #cbd5ca;padding-top:18px;margin-top:36px}a{color:#145b4b}li{margin:8px 0}code{overflow-wrap:anywhere}</style></head><body><header><a href=\"/\">YouTube Uploader</a></header><main><h1>");
     body.push_str(title);
     body.push_str("</h1>");
     body.push_str(content);
